@@ -6,90 +6,98 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-[Route("api/[controller]")]
-[ApiController]
-public class AuthController : ControllerBase
+namespace PointCloudViewer.Server.Controllers
 {
-    private readonly UserManager<IdentityUser> _userManager;
-    private readonly SignInManager<IdentityUser> _signInManager;
-    private readonly IConfiguration _configuration;
-
-    public AuthController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager, IConfiguration configuration)
+    [Route("api/[controller]")]
+    [ApiController]
+    public class AuthController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager, IConfiguration configuration) : ControllerBase
     {
-        _userManager = userManager;
-        _signInManager = signInManager;
-        _configuration = configuration;
-    }
+        private readonly UserManager<IdentityUser> _userManager = userManager;
+        private readonly SignInManager<IdentityUser> _signInManager = signInManager;
+        private readonly IConfiguration _configuration = configuration;
 
-    [HttpPost("register")]
-    [AllowAnonymous]
-    public async Task<IActionResult> Register([FromBody] RegisterModel model)
-    {
-        var user = new IdentityUser { UserName = model.Username, Email = model.Email };
-        var result = await _userManager.CreateAsync(user, model.Password);
-
-        if (result.Succeeded)
+        [HttpPost("register")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Register([FromBody] RegisterModel model)
         {
-            return Ok(new { Message = "User created successfully" });
+            var user = new IdentityUser { UserName = model.Username, Email = model.Email };
+            var result = await _userManager.CreateAsync(user, model.Password);
+
+            if (result.Succeeded)
+            {
+                return Ok(new { Message = "User created successfully" });
+            }
+
+            return BadRequest(result.Errors);
         }
 
-        return BadRequest(result.Errors);
-    }
-
-    [HttpPost("login")]
-    [AllowAnonymous]
-    public async Task<IActionResult> Login([FromBody] LoginModel model)
-    {
-        var result = await _signInManager.PasswordSignInAsync(model.Username, model.Password, false, false);
-
-        if (result.Succeeded)
+        [HttpPost("login")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
-            var user = await _userManager.FindByNameAsync(model.Username);
-            var token = GenerateJwtToken(user);
-            return Ok(new { Token = token });
+            var result = await _signInManager.PasswordSignInAsync(model.Username, model.Password, false, false);
+
+            if (result.Succeeded)
+            {
+                var user = await _userManager.FindByNameAsync(model.Username);
+                if (user != null)
+                {
+                    var token = GenerateJwtToken(user);
+                    return Ok(new { Token = token });
+                }
+            }
+
+            return Unauthorized();
         }
 
-        return Unauthorized();
-    }
-
-    [HttpPost("logout")]
-    public async Task<IActionResult> Logout()
-    {
-        await _signInManager.SignOutAsync();
-        return Ok(new { Message = "Logged out successfully" });
-    }
-
-    private string GenerateJwtToken(IdentityUser user)
-    {
-        var claims = new[]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout()
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
+            await _signInManager.SignOutAsync();
+            return Ok(new { Message = "Logged out successfully" });
+        }
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        private string? GenerateJwtToken(IdentityUser user)
+        {
+            if (user.UserName == null)
+                return null;
 
-        var token = new JwtSecurityToken(
-            issuer: _configuration["Jwt:Issuer"],
-            audience: _configuration["Jwt:Audience"],
-            claims: claims,
-            expires: DateTime.Now.AddMinutes(30),
-            signingCredentials: creds);
+            var claims = new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+            var jwtKey = _configuration["Jwt:Key"];
+            if (string.IsNullOrEmpty(jwtKey))
+            {
+                throw new InvalidOperationException("JWT Key is not configured.");
+            }
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(30),
+                signingCredentials: creds);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
     }
-}
 
-public class RegisterModel
-{
-    public string Username { get; set; }
-    public string Email { get; set; }
-    public string Password { get; set; }
-}
+    public class RegisterModel
+    {
+        public required string Username { get; set; }
+        public required string Email { get; set; }
+        public required string Password { get; set; }
+    }
 
-public class LoginModel
-{
-    public string Username { get; set; }
-    public string Password { get; set; }
+    public class LoginModel
+    {
+        public required string Username { get; set; }
+        public required string Password { get; set; }
+    }
 }
