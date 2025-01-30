@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using PointCloudViewer.Server;
 
@@ -65,11 +66,12 @@ app.MapStaticAssets();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    SeedAdminUser(app);
 }
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication(); // Add this line to enable authentication
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
@@ -77,3 +79,50 @@ app.MapControllers();
 app.MapFallbackToFile("/index.html");
 
 app.Run();
+
+static void SeedAdminUser(IHost app)
+{
+    using var scope = app.Services.CreateScope();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var identityOptions = scope.ServiceProvider.GetRequiredService<IOptions<IdentityOptions>>().Value;
+
+    var adminRole = "Admin";
+    var adminEmail = "admin@example.com";
+    var adminUsername = "admin";
+    var adminPassword = "admin";
+
+    // Temporarily disable password requirements
+    var originalPasswordOptions = identityOptions.Password;
+    identityOptions.Password.RequireDigit = false;
+    identityOptions.Password.RequiredLength = 1;
+    identityOptions.Password.RequireNonAlphanumeric = false;
+    identityOptions.Password.RequireUppercase = false;
+    identityOptions.Password.RequireLowercase = false;
+
+    try
+    {
+        // Ensure the admin role exists
+        if (!roleManager.RoleExistsAsync(adminRole).Result)
+        {
+            roleManager.CreateAsync(new IdentityRole(adminRole)).Wait();
+        }
+
+        // Ensure the admin user exists
+        var adminUser = userManager.FindByEmailAsync(adminEmail).Result;
+        if (adminUser == null)
+        {
+            adminUser = new IdentityUser { UserName = adminUsername, Email = adminEmail };
+            var result = userManager.CreateAsync(adminUser, adminPassword).Result;
+            if (result.Succeeded)
+            {
+                userManager.AddToRoleAsync(adminUser, adminRole).Wait();
+            }
+        }
+    }
+    finally
+    {
+        // Restore original password options
+        identityOptions.Password = originalPasswordOptions;
+    }
+}
