@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div class="h-full">
     <Login v-if="!isAuthenticated" />
     <div v-else>
       <h1>Welcome to the Point Cloud Viewer</h1>
