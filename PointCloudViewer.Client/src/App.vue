@@ -1,22 +1,21 @@
 <template>
-  <div class="h-full">
-    <Login v-if="!isAuthenticated" />
-    <div v-else>
-      <h1>Welcome to the Point Cloud Viewer</h1>
-      <button @click="logout">Logout</button>
-    </div>
-  </div>
+  <NavBar />
+  <main>
+    <RouterView />
+  </main>
 </template>
 
 <script lang="ts">
   import { defineComponent, computed } from 'vue';
   import { useAuthStore } from './stores/auth';
-  import Login from './components/TheLogin.vue';
+  import UserLogin from './components/UserLogin.vue';
+  import NavBar from './components/NavBar.vue'
 
   export default defineComponent({
     name: 'App',
     components: {
-      Login,
+      UserLogin,
+      NavBar,
     },
     setup() {
       const authStore = useAuthStore();

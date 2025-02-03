@@ -45,20 +45,23 @@
 
 <script lang="ts">
   import { defineComponent, ref } from 'vue';
+  import { useRouter } from 'vue-router';
   import { useAuthStore } from '../stores/auth';
 
   export default defineComponent({
-    name: 'TheLogin',
+    name: 'UserLogin',
     setup() {
       const username = ref('');
       const password = ref('');
       const error = ref('');
       const authStore = useAuthStore();
+      const router = useRouter();
 
       const login = async () => {
         try {
           await authStore.login(username.value, password.value);
           error.value = '';
+          router.push('/');
         } catch (err) {
           error.value = err.message;
         }

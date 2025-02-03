@@ -6,6 +6,14 @@ export const useAuthStore = defineStore('auth', {
     token: localStorage.getItem('token') || '',
   }),
   actions: {
+    async registerNewUser(username: string, email: string, password: string) {
+      try {
+        await axios.post('/api/auth/register', { username, email, password });
+      } catch (error) {
+        console.log(error);
+        throw new Error('Failed to register new user');
+      }
+    },
     async login(username: string, password: string) {
       try {
         const response = await axios.post('/api/auth/login', { username, password });
@@ -16,9 +24,16 @@ export const useAuthStore = defineStore('auth', {
         throw new Error('Invalid username or password');
       }
     },
-    logout() {
-      this.token = '';
-      localStorage.removeItem('token');
+    async logout() {
+      try {
+        await axios.post('/api/auth/logout', {});
+      } catch (error) {
+        console.log(error);
+      }
+      finally {
+        this.token = '';
+        localStorage.removeItem('token');
+      }
     },
   },
   getters: {
