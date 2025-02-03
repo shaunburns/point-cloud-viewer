@@ -1,0 +1,8 @@
+# Visual Studio cache/options directory
+.vs/
+
+# Application specific
+build/
+vcpkg/
+vcpkg_installed/
+vcpkg-manifest-install.log

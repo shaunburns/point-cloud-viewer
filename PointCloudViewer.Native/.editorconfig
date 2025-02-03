@@ -1,0 +1,51 @@
+# EditorConfig
+root = true
+
+[*.{h,c,cpp,hpp}]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+# Indentation settings
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+# Use braces for all control statements, even single-line
+brace_style = allman
+
+# Whitespace settings
+use_tabs = false
+trim_trailing_whitespace = true
+
+# Function declaration/definition style
+space_after_function_name = true
+space_after_if = true
+space_after_for = true
+space_after_while = true
+space_after_switch = true
+
+# Pointer and reference alignment
+pointer_alignment = left
+reference_alignment = left
+
+# Ensure consistent naming conventions
+naming_convention_variable_case = camelCase
+naming_convention_function_case = PascalCase
+naming_convention_class_case = PascalCase
+
+# Include ordering
+include_order = "standard_library, project, other"
+
+# C++ standards settings
+std = c++20
+
+# Commenting
+use_single_line_comments = true
+vc_generate_documentation_comments = doxygen_triple_slash
+
+# Enforce `const` correctness
+enforce_const_correctness = true
+
+# Avoid using preprocessor directives wherever possible
+avoid_preprocessor_directives = true
