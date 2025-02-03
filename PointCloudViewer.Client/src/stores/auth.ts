@@ -4,6 +4,7 @@ import axios from 'axios';
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem('token') || '',
+    axiosInterceptor: null as number | null,
   }),
   actions: {
     async registerNewUser(username: string, email: string, password: string) {
@@ -19,6 +20,15 @@ export const useAuthStore = defineStore('auth', {
         const response = await axios.post('/api/auth/login', { username, password });
         this.token = response.data.token;
         localStorage.setItem('token', this.token);
+
+        if (this.axiosInterceptor == null) {
+          this.axiosInterceptor = axios.interceptors.request.use((config) => {
+            if (this.token) {
+              config.headers.Authorization = `Bearer ${this.token}`;
+            }
+            return config;
+          });
+        }
       } catch (error) {
         console.log(error);
         throw new Error('Invalid username or password');
@@ -33,6 +43,11 @@ export const useAuthStore = defineStore('auth', {
       finally {
         this.token = '';
         localStorage.removeItem('token');
+
+        if (this.axiosInterceptor !== null) {
+          axios.interceptors.request.eject(this.axiosInterceptor);
+          this.axiosInterceptor = null;
+        }
       }
     },
   },

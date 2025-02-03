@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Tokens;
 using PointCloudViewer.Server;
 
@@ -33,26 +34,7 @@ builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
-// Configure JWT authentication
-var key = System.Text.Encoding.ASCII.GetBytes("YourSecretKeyHere"); // Use a secure key in production
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = "YourIssuer",
-        ValidAudience = "YourAudience",
-        IssuerSigningKey = new SymmetricSecurityKey(key)
-    };
-});
+builder.Services.ConfigureJwtAuth(builder.Configuration); 
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -67,6 +49,11 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     SeedAdminUser(app);
+
+    // This should be disabled in any production workloads as it will fail GDPR compliance
+    // Enable if required to debug locally:
+    // IdentityModelEventSource.ShowPII = true;
+    // IdentityModelEventSource.LogCompleteSecurityArtifact = true;
 }
 
 app.UseHttpsRedirection();
@@ -124,5 +111,39 @@ static void SeedAdminUser(IHost app)
     {
         // Restore original password options
         identityOptions.Password = originalPasswordOptions;
+    }
+}
+
+static class JwtTokenConfigurationExtensions
+{
+    public static void ConfigureJwtAuth(this IServiceCollection services, IConfiguration config)
+    {
+        string? jwtKey = config["Jwt:Key"];
+        if (jwtKey == null)
+        {
+            // TODO: Log Error of bad JWT configuration
+            return;
+        }
+
+        // Configure JWT authentication
+        var key = System.Text.Encoding.UTF8.GetBytes(jwtKey);
+        services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = config["Jwt:Issuer"],
+                ValidAudience = config["Jwt:Audience"],
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+            };
+        });
     }
 }
