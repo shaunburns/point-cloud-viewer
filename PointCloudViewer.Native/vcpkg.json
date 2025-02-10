@@ -1,6 +1,9 @@
 {
   "dependencies": [
     "sdl2",
-    "glew"
+    {
+      "name": "glad",
+      "features": [ "gles2-api-20" ]
+    }
   ]
 }

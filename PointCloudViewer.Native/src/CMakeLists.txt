@@ -7,11 +7,11 @@ target_sources(PointCloudViewer
 )
 
 find_package(SDL2 CONFIG REQUIRED)
-find_package(GLEW REQUIRED)
+find_package(glad REQUIRED)
 
 target_link_libraries(PointCloudViewer PRIVATE
 	SDL2::SDL2
-    GLEW::GLEW
+    glad::glad
 )
 
 if (EMSCRIPTEN)

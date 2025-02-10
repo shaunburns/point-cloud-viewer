@@ -1,8 +1,8 @@
+#include <glad/glad.h>
+
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
-// #include <SDL2/SDL_opengles2.h>
-
-#include "GL/glew.h"
+#include <SDL2/SDL_opengles2.h>
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -39,31 +39,16 @@ const char* fragmentShaderSource = R"(
     }
 )";
 
-GLfloat vertices[] = {0.0f, 1.0f, 0.0f, -1.0f, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f};
+GLfloat vertices[] = {0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f};
 
-extern "C"
-{
-    EMSCRIPTEN_KEEPALIVE
-    void StartRendering()
-    {
-        running = true;
-    }
-
-    EMSCRIPTEN_KEEPALIVE
-    void StopRendering()
-    {
-        running = false;
-    }
-}
-
-void UpdateViewport(int newWidth, int newHeight)
+static void UpdateViewport(int newWidth, int newHeight)
 {
     width = newWidth;
     height = newHeight;
     glViewport(0, 0, width, height);
 }
 
-void HandleEvent(SDL_Event& event)
+static void HandleEvent(SDL_Event& event)
 {
     if (event.type == SDL_WINDOWEVENT)
     {
@@ -93,10 +78,6 @@ static void Render()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(shaderProgram);
-
-    glLoadIdentity();
-    glTranslatef(0.0f, 0.0f, -5.0f);
-    glRotatef(angle, 0.0f, 1.0f, 0.0f);
 
     GLuint vbo;
     glGenBuffers(1, &vbo);
@@ -161,15 +142,9 @@ static void CreateGlContext()
     glContext = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, glContext);
 
-    GLenum GlewError = glewInit();
-    if (GlewError != GLEW_OK)
-    {
-        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize GLEW: %s", glewGetErrorString(GlewError));
-        return;
-    }
+    gladLoadGLES2Loader(SDL_GL_GetProcAddress);
 
     shaderProgram = CreateProgram();
-
     glEnable(GL_DEPTH_TEST);
 }
 
@@ -204,15 +179,43 @@ static void MainLoop()
     Render();
 }
 
+static void RequestQuit()
+{
+    running = false;
+
+#if __EMSCRIPTEN__
+    emscripten_cancel_main_loop();
+#endif
+}
+
+extern "C"
+{
+    EMSCRIPTEN_KEEPALIVE
+    void StartRendering()
+    {
+        running = true;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    void StopRendering()
+    {
+        RequestQuit();
+    }
+}
+
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_GL_LoadLibrary(nullptr);
+
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 
     // Disable keyboard capture so that other elements on the webpage can receive input
-    // SDL_EventState(SDL_TEXTINPUT, SDL_DISABLE);
-    // SDL_EventState(SDL_KEYDOWN, SDL_DISABLE);
-    // SDL_EventState(SDL_KEYUP, SDL_DISABLE);
+    SDL_EventState(SDL_TEXTINPUT, SDL_DISABLE);
+    SDL_EventState(SDL_KEYDOWN, SDL_DISABLE);
+    SDL_EventState(SDL_KEYUP, SDL_DISABLE);
 
     CreateWindowRenderer();
     CreateGlContext();
