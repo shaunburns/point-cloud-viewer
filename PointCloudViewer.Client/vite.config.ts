@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import child_process from 'child_process';
 import { env } from 'process';
+import wasm from 'vite-plugin-wasm';
 
 const baseFolder =
     env.APPDATA !== undefined && env.APPDATA !== ''
@@ -43,6 +44,7 @@ export default defineConfig({
     plugins: [
       plugin(),
       tailwindcss(),
+      wasm(),
     ],
     resolve: {
         alias: {

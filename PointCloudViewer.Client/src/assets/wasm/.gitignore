@@ -1,0 +1,4 @@
+# Ignore generated PointCloudViewer.Native generated files
+PointCloudViewer.d.ts
+PointCloudViewer.js
+PointCloudViewer.wasm
