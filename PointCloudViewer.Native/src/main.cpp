@@ -15,168 +15,64 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
-SDL_Window* window = nullptr;
-SDL_Renderer* renderer = nullptr;
-SDL_GLContext glContext = nullptr;
-GLuint shaderProgram = 0;
-bool running = true;
-int width = 800;
-int height = 600;
-float angle = 0.0f;
-bool quit = false;
+static SDL_Window* window = nullptr;
+static bool running = true;
 
 const char* vertexShaderSource = R"(
-    attribute vec3 aPos;
-    void main() {
-        gl_Position = vec4(aPos, 1.0);
-    }
+attribute vec4 position;
+attribute vec2 texcoord;
+varying vec2 v_texcoord;
+
+void main() {
+    gl_Position = position;
+    v_texcoord = texcoord;
+}
 )";
 
 const char* fragmentShaderSource = R"(
-    precision mediump float;
-    void main() {
-        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-    }
+precision mediump float;
+varying vec2 v_texcoord;
+uniform sampler2D texture;
+
+void main() {
+    gl_FragColor = texture2D(texture, v_texcoord);
+}
 )";
-
-GLfloat vertices[] = {0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f};
-
-static void UpdateViewport(int newWidth, int newHeight)
-{
-    width = newWidth;
-    height = newHeight;
-    glViewport(0, 0, width, height);
-}
-
-static void HandleEvent(SDL_Event& event)
-{
-    if (event.type == SDL_WINDOWEVENT)
-    {
-        if (event.window.event == SDL_WINDOWEVENT_RESIZED)
-        {
-            UpdateViewport(event.window.data1, event.window.data2);
-        }
-    }
-    else if (event.type == SDL_QUIT)
-    {
-        quit = true;
-    }
-}
-
-static void Update()
-{
-    SDL_Event event{};
-    while (SDL_PollEvent(&event))
-    {
-        HandleEvent(event);
-    }
-
-    angle += 0.01f;
-}
-
-static void Render()
-{
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glUseProgram(shaderProgram);
-
-    GLuint vbo;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    GLint posAttrib = glGetAttribLocation(shaderProgram, "aPos");
-    glEnableVertexAttribArray(posAttrib);
-    glVertexAttribPointer(posAttrib, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
-
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-
-    SDL_GL_SwapWindow(window);
-}
 
 static GLuint CompileShader(GLenum type, const char* source)
 {
     GLuint shader = glCreateShader(type);
-    glShaderSource(shader, 1, &source, nullptr);
+    glShaderSource(shader, 1, &source, NULL);
     glCompileShader(shader);
-
-    GLint compiled = 0;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
-    if (compiled != GL_TRUE)
-    {
-        char infoLog[512];
-        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Shader Compilation Error: %s", infoLog);
-        return 0;
-    }
-
     return shader;
 }
 
-static GLuint CreateProgram()
+static GLuint CreateProgram(const char* vertexSource, const char* fragmentSource)
 {
-    GLuint vertexShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource);
-    GLuint fragmentShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
-
     GLuint program = glCreateProgram();
+    GLuint vertexShader = CompileShader(GL_VERTEX_SHADER, vertexSource);
+    GLuint fragmentShader = CompileShader(GL_FRAGMENT_SHADER, fragmentSource);
     glAttachShader(program, vertexShader);
     glAttachShader(program, fragmentShader);
     glLinkProgram(program);
-
-    GLint linked = 0;
-    glGetProgramiv(program, GL_LINK_STATUS, &linked);
-    if (linked != GL_TRUE)
-    {
-        char infoLog[512];
-        glGetProgramInfoLog(program, 512, nullptr, infoLog);
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Program Linking Error: %s", infoLog);
-        return 0;
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
     return program;
 }
 
-static void CreateGlContext()
+static void GenerateCheckerboard(SDL_Surface* surface)
 {
-    glContext = SDL_GL_CreateContext(window);
-    SDL_GL_MakeCurrent(window, glContext);
+    const int checkerSize = 8;
 
-    gladLoadGLES2Loader(SDL_GL_GetProcAddress);
-
-    shaderProgram = CreateProgram();
-    glEnable(GL_DEPTH_TEST);
-}
-
-static void DestroyGlContext()
-{
-    glDeleteProgram(shaderProgram);
-    shaderProgram = 0;
-
-    SDL_GL_DeleteContext(glContext);
-    glContext = nullptr;
-}
-
-static void CreateWindowRenderer()
-{
-    SDL_CreateWindowAndRenderer(width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE, &window, &renderer);
-}
-
-static void DestroyWindowRenderer()
-{
-    SDL_DestroyRenderer(renderer);
-    renderer = nullptr;
-    SDL_DestroyWindow(window);
-    window = nullptr;
-}
-
-static void MainLoop()
-{
-    if (!running)
-        return;
-
-    Update();
-    Render();
+    SDL_LockSurface(surface);
+    uint32_t* pixels = (uint32_t*) surface->pixels;
+    for (int y = 0; y < surface->h; ++y)
+    {
+        for (int x = 0; x < surface->w; ++x)
+        {
+            int checker = ((x / checkerSize) % 2 == (y / checkerSize) % 2) ? 0xFFFFFFFF : 0xFF000000;
+            pixels[y * surface->w + x] = checker;
+        }
+    }
+    SDL_UnlockSurface(surface);
 }
 
 static void RequestQuit()
@@ -186,6 +82,22 @@ static void RequestQuit()
 #if __EMSCRIPTEN__
     emscripten_cancel_main_loop();
 #endif
+}
+
+static void MainLoop()
+{
+    SDL_Event event{};
+    while (SDL_PollEvent(&event))
+    {
+        if (event.type == SDL_QUIT)
+        {
+            RequestQuit();
+        }
+    }
+
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    SDL_GL_SwapWindow(window);
 }
 
 extern "C"
@@ -205,33 +117,70 @@ extern "C"
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
-    SDL_Init(SDL_INIT_VIDEO);
+    SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
 
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    window = SDL_CreateWindow("Point Cloud Viewer Native", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 600, SDL_WINDOW_OPENGL);
+    SDL_GLContext glContext = SDL_GL_CreateContext(window);
+    gladLoadGLES2Loader(SDL_GL_GetProcAddress);
 
-    // Disable keyboard capture so that other elements on the webpage can receive input
-    SDL_EventState(SDL_TEXTINPUT, SDL_DISABLE);
-    SDL_EventState(SDL_KEYDOWN, SDL_DISABLE);
-    SDL_EventState(SDL_KEYUP, SDL_DISABLE);
+    GLuint program = CreateProgram(vertexShaderSource, fragmentShaderSource);
+    glUseProgram(program);
 
-    CreateWindowRenderer();
-    CreateGlContext();
+    GLfloat vertices[4][4] = {
+        {-1.0f, 1.0f,  0.0f, 0.0f},
+        {1.0f,  1.0f,  1.0f, 0.0f},
+        {1.0f,  -1.0f, 1.0f, 1.0f},
+        {-1.0f, -1.0f, 0.0f, 1.0f},
+    };
+
+    GLuint indices[] = {0, 1, 2, 2, 3, 0};
+
+    GLuint vertexBuffer;
+    glGenBuffers(1, &vertexBuffer);
+    GLuint indexBuffer;
+    glGenBuffers(1, &indexBuffer);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    GLint positionAttrib = glGetAttribLocation(program, "position");
+    glVertexAttribPointer(positionAttrib, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (const void*) 0);
+    glEnableVertexAttribArray(positionAttrib);
+
+    GLint texcoordAttrib = glGetAttribLocation(program, "texcoord");
+    glVertexAttribPointer(texcoordAttrib, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (const void*) (2 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(texcoordAttrib);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    SDL_Surface* checkerboardSurface = SDL_CreateRGBSurface(0, 64, 64, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
+    GenerateCheckerboard(checkerboardSurface);
+
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 64, 64, 0, GL_RGBA, GL_UNSIGNED_BYTE, checkerboardSurface->pixels);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 #if __EMSCRIPTEN__
     emscripten_set_main_loop(MainLoop, 0, 1);
 #else
-    while (!quit)
+    while (running)
     {
         MainLoop();
     }
 #endif
 
-    DestroyGlContext();
-    DestroyWindowRenderer();
+    SDL_FreeSurface(checkerboardSurface);
+    glDeleteTextures(1, &texture);
+    glDeleteProgram(program);
+    glDeleteBuffers(1, &vertexBuffer);
+    glDeleteBuffers(1, &indexBuffer);
 
+    SDL_GL_DeleteContext(glContext);
+    SDL_DestroyWindow(window);
     SDL_Quit();
-    return 0;
 }

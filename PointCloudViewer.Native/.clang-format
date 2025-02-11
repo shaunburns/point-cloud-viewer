@@ -13,6 +13,8 @@ AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
 AlignOperands: true
 AlignTrailingComments: true
+ContinuationIndentWidth: 4
+AlignArrayOfStructures: Left
 
 # Braces
 BreakBeforeBraces: Custom
