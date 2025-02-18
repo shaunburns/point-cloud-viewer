@@ -1,6 +1,6 @@
 <template>
-  <NavBar />
-  <main>
+  <NavBar class="sticky top-0" />
+  <main class="h-full w-full" >
     <RouterView />
   </main>
 </template>
