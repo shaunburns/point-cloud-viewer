@@ -1,30 +1,25 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+using PointCloudViewer.Server.DTOs;
+using PointCloudViewer.Server.Services.Interfaces;
 
 namespace PointCloudViewer.Server.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AuthController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager, IConfiguration configuration) : ControllerBase
+    public class AuthController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager, ITokenService tokenService) : ControllerBase
     {
         private readonly UserManager<IdentityUser> _userManager = userManager;
         private readonly SignInManager<IdentityUser> _signInManager = signInManager;
-        private readonly IConfiguration _configuration = configuration;
-
-        private static int ExpirationMinutes => 30;
+        private readonly ITokenService _tokenService = tokenService;
 
         [HttpPost("register")]
         [AllowAnonymous]
-        public async Task<IActionResult> Register([FromBody] RegisterModel model)
+        public async Task<IActionResult> Register([FromBody] RegisterNewUserRequestDTO dto)
         {
-            var user = new IdentityUser { UserName = model.Username, Email = model.Email };
-            var result = await _userManager.CreateAsync(user, model.Password);
+            var user = new IdentityUser { UserName = dto.Username, Email = dto.Email };
+            var result = await _userManager.CreateAsync(user, dto.Password);
 
             if (result.Succeeded)
             {
@@ -36,16 +31,16 @@ namespace PointCloudViewer.Server.Controllers
 
         [HttpPost("login")]
         [AllowAnonymous]
-        public async Task<IActionResult> Login([FromBody] LoginModel model)
+        public async Task<IActionResult> Login([FromBody] UserLoginRequestDTO dto)
         {
-            var result = await _signInManager.PasswordSignInAsync(model.Username, model.Password, false, false);
+            var result = await _signInManager.PasswordSignInAsync(dto.Username, dto.Password, false, false);
 
             if (result.Succeeded)
             {
-                var user = await _userManager.FindByNameAsync(model.Username);
+                var user = await _userManager.FindByNameAsync(dto.Username);
                 if (user != null)
                 {
-                    var token = GenerateJwtToken(user);
+                    var token = _tokenService.GenerateJwtToken(user);
                     return Ok(new { Token = token });
                 }
             }
@@ -65,13 +60,7 @@ namespace PointCloudViewer.Server.Controllers
         public async Task<IActionResult> Refresh()
         {
             var token = Request.Headers.Authorization.ToString().Replace("Bearer ", "");
-            var principal = GetPrincipalFromExpiredToken(token);
-            if (principal == null)
-            {
-                return Unauthorized();
-            }
-
-            var principalIdentityName = principal.Identity?.Name;
+            var principalIdentityName = _tokenService.GetPrincipalIdentityNameFromExpiredToken(token);
             if (string.IsNullOrEmpty(principalIdentityName))
             {
                 return Unauthorized();
@@ -83,98 +72,8 @@ namespace PointCloudViewer.Server.Controllers
                 return Unauthorized();
             }
 
-            var newToken = GenerateJwtToken(user);
+            var newToken = _tokenService.GenerateJwtToken(user);
             return Ok(new { Token = newToken });
         }
-
-        private string GetJwtKey()
-        {
-            var jwtKey = _configuration["Jwt:Key"];
-            if (string.IsNullOrEmpty(jwtKey))
-            {
-                throw new InvalidOperationException("JWT Key is not configured.");
-            }
-            return jwtKey;
-        }
-
-        private string? GenerateJwtToken(IdentityUser user)
-        {
-            if (user.UserName == null)
-                return null;
-            if (user.Email == null)
-                return null;
-
-            var claims = new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()),
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(ClaimTypes.Email, user.Email),
-            };
-
-            var jwtKey = GetJwtKey();
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.Now.AddMinutes(ExpirationMinutes),
-                signingCredentials: creds);
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
-
-        private ClaimsPrincipal? GetPrincipalFromExpiredToken(string token)
-        {
-            var jwtKey = GetJwtKey();
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-
-            var tokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = false, // We want to get the claims from an expired token
-                ValidateIssuerSigningKey = true,
-                ValidIssuer = _configuration["Jwt:Issuer"],
-                ValidAudience = _configuration["Jwt:Audience"],
-                IssuerSigningKey = key,
-            };
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-            try
-            {
-                var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
-                if (securityToken is JwtSecurityToken jwtSecurityToken)
-                {
-                    if (jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        return principal;
-                    }
-                }
-            }
-            catch
-            {
-                return null;
-            }
-
-            return null;
-        }
-    }
-
-    public class RegisterModel
-    {
-        public required string Username { get; set; }
-        public required string Email { get; set; }
-        public required string Password { get; set; }
-    }
-
-    public class LoginModel
-    {
-        public required string Username { get; set; }
-        public required string Password { get; set; }
     }
 }

@@ -6,6 +6,8 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Tokens;
 using PointCloudViewer.Server;
+using PointCloudViewer.Server.Services;
+using PointCloudViewer.Server.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +30,8 @@ else
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=AppDb.db"));
 }
+
+ConfigureServices(builder.Services);
 
 // Add Identity services
 builder.Services.AddIdentity<IdentityUser, IdentityRole>()
@@ -66,6 +70,11 @@ app.MapControllers();
 app.MapFallbackToFile("/index.html");
 
 app.Run();
+
+static void ConfigureServices(IServiceCollection services)
+{
+    services.AddScoped<ITokenService, TokenService>();
+}
 
 static void SeedAdminUser(IHost app)
 {
