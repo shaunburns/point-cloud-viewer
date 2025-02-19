@@ -1,11 +1,19 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
+
+interface AuthState {
+  token: string;
+  axiosInterceptor: number | null;
+}
 
 export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    token: localStorage.getItem('token') || '',
-    axiosInterceptor: null as number | null,
-  }),
+  state: (): AuthState => {
+    return {
+      token: localStorage.getItem('token') || '',
+      axiosInterceptor: null as number | null,
+    };
+  },
   actions: {
     async registerNewUser(username: string, email: string, password: string) {
       try {
@@ -50,8 +58,29 @@ export const useAuthStore = defineStore('auth', {
         }
       }
     },
+    async refresh() {
+      try {
+        const response = await axios.post('/api/auth/refresh', {});
+        this.token = response.data.token;
+        localStorage.setItem('token', this.token);
+      } catch (error) {
+        console.log(error);
+        throw new Error('Failed to refresh token');
+      }
+    }
   },
   getters: {
-    isAuthenticated: (state) => !!state.token,
+    isAuthenticated(state: AuthState): boolean {
+      if (!!state.token) {
+        const decodedToken = jwtDecode(state.token);
+        const expiryTime = decodedToken.exp * 1000;
+        const currentTime = Date.now();
+        if (expiryTime > currentTime) {
+          return true;
+        }
+      }
+
+      return false;
+    },
   },
 });

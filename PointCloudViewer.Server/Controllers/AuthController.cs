@@ -60,6 +60,43 @@ namespace PointCloudViewer.Server.Controllers
             return Ok(new { Message = "Logged out successfully" });
         }
 
+        [HttpPost("refresh")]
+        [Authorize]
+        public async Task<IActionResult> Refresh()
+        {
+            var token = Request.Headers.Authorization.ToString().Replace("Bearer ", "");
+            var principal = GetPrincipalFromExpiredToken(token);
+            if (principal == null)
+            {
+                return Unauthorized();
+            }
+
+            var principalIdentityName = principal.Identity?.Name;
+            if (string.IsNullOrEmpty(principalIdentityName))
+            {
+                return Unauthorized();
+            }
+
+            var user = await _userManager.FindByNameAsync(principalIdentityName);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var newToken = GenerateJwtToken(user);
+            return Ok(new { Token = newToken });
+        }
+
+        private string GetJwtKey()
+        {
+            var jwtKey = _configuration["Jwt:Key"];
+            if (string.IsNullOrEmpty(jwtKey))
+            {
+                throw new InvalidOperationException("JWT Key is not configured.");
+            }
+            return jwtKey;
+        }
+
         private string? GenerateJwtToken(IdentityUser user)
         {
             if (user.UserName == null)
@@ -77,12 +114,7 @@ namespace PointCloudViewer.Server.Controllers
                 new Claim(ClaimTypes.Email, user.Email),
             };
 
-            var jwtKey = _configuration["Jwt:Key"];
-            if (string.IsNullOrEmpty(jwtKey))
-            {
-                throw new InvalidOperationException("JWT Key is not configured.");
-            }
-
+            var jwtKey = GetJwtKey();
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -94,6 +126,42 @@ namespace PointCloudViewer.Server.Controllers
                 signingCredentials: creds);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private ClaimsPrincipal? GetPrincipalFromExpiredToken(string token)
+        {
+            var jwtKey = GetJwtKey();
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+            var tokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = false, // We want to get the claims from an expired token
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = _configuration["Jwt:Issuer"],
+                ValidAudience = _configuration["Jwt:Audience"],
+                IssuerSigningKey = key,
+            };
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            try
+            {
+                var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
+                if (securityToken is JwtSecurityToken jwtSecurityToken)
+                {
+                    if (jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        return principal;
+                    }
+                }
+            }
+            catch
+            {
+                return null;
+            }
+
+            return null;
         }
     }
 
