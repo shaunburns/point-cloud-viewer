@@ -1,10 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
-using PointCloudViewer.Server;
-using PointCloudViewer.Server.DTOs;
+﻿using PointCloudViewer.Server.DTOs;
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Data.Sqlite;
 
 namespace PointCloudViewer.ServerTests.IntegrationTests
 {
