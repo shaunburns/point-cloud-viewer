@@ -51,6 +51,11 @@ app.MapStaticAssets();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    // Ensure the database is created and opened
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    db.Database.EnsureCreated();
+
     app.MapOpenApi();
     SeedAdminUser(app);
 
@@ -156,3 +161,5 @@ static class JwtTokenConfigurationExtensions
         });
     }
 }
+
+public partial class Program { }

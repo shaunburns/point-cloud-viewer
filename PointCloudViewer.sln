@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PointCloudViewer.Server", "
 EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "PointCloudViewer.Client", "PointCloudViewer.Client\PointCloudViewer.Client.esproj", "{947D89A5-4E03-49D8-AE34-69A5595B0F99}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PointCloudViewer.ServerTests", "PointCloudViewer.ServerTests\PointCloudViewer.ServerTests.csproj", "{6229B0B2-90EE-4B9D-AF92-20A4A8AFB2A7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,8 +25,15 @@ Global
 		{947D89A5-4E03-49D8-AE34-69A5595B0F99}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{947D89A5-4E03-49D8-AE34-69A5595B0F99}.Release|Any CPU.Build.0 = Release|Any CPU
 		{947D89A5-4E03-49D8-AE34-69A5595B0F99}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{6229B0B2-90EE-4B9D-AF92-20A4A8AFB2A7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6229B0B2-90EE-4B9D-AF92-20A4A8AFB2A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6229B0B2-90EE-4B9D-AF92-20A4A8AFB2A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6229B0B2-90EE-4B9D-AF92-20A4A8AFB2A7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9232A407-6077-4CD6-A974-E6E0B672F3C7}
 	EndGlobalSection
 EndGlobal
